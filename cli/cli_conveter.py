@@ -1,140 +1,176 @@
 # cli/cli_converter.py
 import argparse
-import sys
 import os
-from pathlib import Path
+import sys
+import time
 
-from conversion.engine import ConversionEngine
-from utils.file_handler import FileHandler
+# Add parent directory to path untuk import
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from conversion.engine import create_conversion_engine
 
 
 class CLIConverter:
-    """Command Line Interface untuk Document Converter"""
+    """CLI interface untuk Document Converter"""
     
     def __init__(self):
-        self.conversion_engine = ConversionEngine()
-        self.has_ms_word = self.conversion_engine.check_ms_word_installation()
-        self.conversion_engine.has_ms_word = self.has_ms_word
+        self.engine = create_conversion_engine()
+        self.parser = self._setup_parser()
     
-    def setup_parser(self) -> argparse.ArgumentParser:
+    def _setup_parser(self):
         """Setup argument parser"""
         parser = argparse.ArgumentParser(
-            description="Document Converter - CLI Tool untuk konversi DOC/DOCX ↔ PDF",
+            description='Document Converter - Konversi dokumen antara PDF, DOC, dan DOCX',
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Contoh penggunaan:
-  python cli_converter.py -i input.docx -o output.pdf -t doc_to_pdf
-  python cli_converter.py -i document.pdf -o output.docx -t pdf_to_docx --method pdf2docx
-  python cli_converter.py -i file.pdf -o document.doc -t pdf_to_doc
-            
-Supported conversions:
-  • doc_to_pdf    : Convert DOC/DOCX ke PDF
-  • pdf_to_docx   : Convert PDF ke DOCX
-  • pdf_to_doc    : Convert PDF ke DOC (membutuhkan MS Word)
+  python main.py doc-to-pdf input.docx output.pdf
+  python main.py pdf-to-docx input.pdf output.docx
+  python main.py pdf-to-doc input.pdf output.doc
+  python main.py --list-supported
+
+Untuk GUI mode, jalankan tanpa argument:
+  python main.py
             """
         )
         
-        parser.add_argument('-i', '--input', required=True, help='File input')
-        parser.add_argument('-o', '--output', required=True, help='File output')
-        parser.add_argument('-t', '--type', required=True, 
-                          choices=['doc_to_pdf', 'pdf_to_docx', 'pdf_to_doc'],
-                          help='Tipe konversi')
-        parser.add_argument('-m', '--method', default='auto',
-                          choices=['auto', 'pdf2docx', 'pymupdf', 'text_only'],
-                          help='Metode konversi untuk PDF ke DOCX')
-        parser.add_argument('-y', '--yes', action='store_true',
-                          help='Auto confirm overwrite')
-        parser.add_argument('-v', '--verbose', action='store_true',
-                          help='Verbose output')
+        # Subcommands
+        subparsers = parser.add_subparsers(dest='command', help='Jenis konversi')
+        
+        # DOC to PDF
+        doc_parser = subparsers.add_parser('doc-to-pdf', help='Konversi DOC/DOCX ke PDF')
+        doc_parser.add_argument('input', help='File input (DOC/DOCX)')
+        doc_parser.add_argument('output', help='File output (PDF)')
+        
+        # PDF to DOCX
+        pdf_docx_parser = subparsers.add_parser('pdf-to-docx', help='Konversi PDF ke DOCX')
+        pdf_docx_parser.add_argument('input', help='File input (PDF)')
+        pdf_docx_parser.add_argument('output', help='File output (DOCX)')
+        pdf_docx_parser.add_argument('--method', choices=['auto', 'pdf2docx', 'pymupdf', 'text_only'],
+                                   default='auto', help='Metode konversi (default: auto)')
+        
+        # PDF to DOC
+        pdf_doc_parser = subparsers.add_parser('pdf-to-doc', help='Konversi PDF ke DOC')
+        pdf_doc_parser.add_argument('input', help='File input (PDF)')
+        pdf_doc_parser.add_argument('output', help='File output (DOC)')
+        
+        # Global options
+        parser.add_argument('--list-supported', action='store_true',
+                          help='Tampilkan daftar konversi yang didukung')
+        parser.add_argument('--force', action='store_true',
+                          help='Force overwrite file output jika sudah ada')
+        parser.add_argument('--verbose', action='store_true',
+                          help='Tampilkan informasi detail')
         
         return parser
     
-    def validate_arguments(self, args: argparse.Namespace) -> bool:
-        """Validasi arguments"""
+    def _check_files(self, input_file: str, output_file: str, force: bool = False) -> bool:
+        """Validasi file input dan output"""
         # Check input file
-        if not os.path.exists(args.input):
-            print(f"❌ ERROR: File input tidak ditemukan: {args.input}")
+        if not os.path.exists(input_file):
+            print(f"❌ Error: File input tidak ditemukan: {input_file}")
+            return False
+        
+        if os.path.getsize(input_file) == 0:
+            print(f"❌ Error: File input kosong: {input_file}")
+            return False
+        
+        # Check output file
+        if os.path.exists(output_file) and not force:
+            print(f"❌ Error: File output sudah ada: {output_file}")
+            print("   Gunakan --force untuk overwrite")
             return False
         
         # Check output directory
-        output_dir = Path(args.output).parent
-        if not output_dir.exists():
-            print(f"❌ ERROR: Directory output tidak ditemukan: {output_dir}")
-            return False
-        
-        # Check file overwrite
-        if os.path.exists(args.output) and not args.yes:
-            response = input(f"⚠️  File {args.output} sudah ada. Overwrite? (y/N): ")
-            if response.lower() != 'y':
-                print("❌ Konversi dibatalkan")
+        output_dir = os.path.dirname(output_file) or '.'
+        if not os.path.exists(output_dir):
+            try:
+                os.makedirs(output_dir)
+                print(f"📁 Membuat directory: {output_dir}")
+            except Exception as e:
+                print(f"❌ Error: Tidak dapat membuat directory output: {e}")
                 return False
-        
-        # Check MS Word requirement
-        if args.type == 'pdf_to_doc' and not self.has_ms_word:
-            print("❌ ERROR: Konversi PDF ke DOC membutuhkan Microsoft Word")
-            print("   Gunakan opsi 'pdf_to_docx' sebagai alternatif")
-            return False
         
         return True
     
-    def print_system_info(self):
-        """Print informasi sistem"""
-        print("🤖 Document Converter - CLI Mode")
-        print("=" * 50)
-        
-        supported = self.conversion_engine.get_supported_conversions()
-        for conv_type, info in supported.items():
-            status = "✅" if info['input_extensions'] else "❌"
-            print(f"{status} {info['description']}")
-        
-        print("=" * 50)
+    def _get_conversion_type(self, command: str) -> str:
+        """Map command ke conversion type"""
+        conversion_map = {
+            'doc-to-pdf': 'doc_to_pdf',
+            'pdf-to-docx': 'pdf_to_docx',
+            'pdf-to-doc': 'pdf_to_doc'
+        }
+        return conversion_map.get(command)
     
-    def convert(self, args: argparse.Namespace) -> bool:
-        """Eksekusi konversi"""
-        try:
+    def run(self):
+        """Jalankan CLI converter"""
+        args = self.parser.parse_args()
+        
+        # Handle list-supported command
+        if args.list_supported or not args.command:
+            self.engine.print_supported_conversions()
+            
+            # Print engine info jika verbose
             if args.verbose:
-                self.print_system_info()
-                print(f"🔄 Memulai konversi: {args.input} → {args.output}")
+                print("\n🔧 ENGINE INFO:")
+                info = self.engine.get_engine_info()
+                for lib, available in info['libraries_available'].items():
+                    status = "✓" if available else "✗"
+                    print(f"   {lib:15} {status}")
+            return
+        
+        # Validasi command
+        conversion_type = self._get_conversion_type(args.command)
+        if not conversion_type:
+            print(f"❌ Error: Command tidak valid: {args.command}")
+            self.parser.print_help()
+            return
+        
+        # Validasi file
+        if not self._check_files(args.input, args.output, args.force):
+            return
+        
+        # Jalankan konversi
+        try:
+            print(f"🔄 Memulai konversi: {args.input} → {args.output}")
+            start_time = time.time()
             
-            # Validasi arguments
-            if not self.validate_arguments(args):
-                return False
+            # Prepare kwargs
+            kwargs = {}
+            if args.command == 'pdf-to-docx':
+                kwargs['conversion_method'] = args.method
             
-            # Eksekusi konversi
-            success = self.conversion_engine.convert(
-                conversion_type=args.type,
+            # Execute conversion
+            success = self.engine.convert(
+                conversion_type=conversion_type,
                 input_file=args.input,
                 output_file=args.output,
-                conversion_method=args.method
+                **kwargs
             )
             
             if success:
-                if args.verbose:
-                    file_info = FileHandler.get_file_info(args.output)
-                    print(f"✅ Konversi berhasil!")
-                    print(f"   Output: {args.output}")
-                    print(f"   Size: {file_info['size']} bytes")
-                else:
-                    print(f"✅ Konversi berhasil: {args.output}")
-                return True
+                end_time = time.time()
+                file_size = os.path.getsize(args.output)
+                print(f"✅ Konversi berhasil!")
+                print(f"📁 Output: {args.output}")
+                print(f"📊 Size: {file_size:,} bytes")
+                print(f"⏱️  Waktu: {end_time - start_time:.2f} detik")
             else:
                 print(f"❌ Konversi gagal")
-                return False
                 
         except Exception as e:
-            print(f"❌ ERROR: {str(e)}")
-            if args.verbose:
-                import traceback
-                traceback.print_exc()
-            return False
-    
-    def run(self):
-        """Jalankan CLI"""
-        parser = self.setup_parser()
-        args = parser.parse_args()
-        
-        success = self.convert(args)
-        sys.exit(0 if success else 1)
+            print(f"❌ Error selama konversi: {str(e)}")
+            
+            # Additional help untuk error spesifik
+            if "Microsoft Word" in str(e):
+                print("\n💡 Tips untuk Microsoft Word:")
+                print("   - Pastikan Microsoft Word terinstall")
+                print("   - Jalankan sebagai administrator jika perlu")
+                print("   - Coba buka Word manual sekali untuk aktivasi")
+            
+            if "library" in str(e).lower() or "import" in str(e).lower():
+                print("\n💡 Tips untuk dependencies:")
+                print("   - Install required libraries: pip install pymupdf python-docx pdf2docx docx2pdf comtypes")
 
 
 def main():
