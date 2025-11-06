@@ -1,4 +1,3 @@
-# conversion/engine.py
 import os
 import sys
 from .strategies import DocToPdfStrategy, PdfToDocxStrategy, PdfToDocStrategy
@@ -154,8 +153,6 @@ class ConversionEngine:
         except ImportError:
             return False
 
-
-# Utility function untuk mudah digunakan
 def create_conversion_engine(force_ms_word_detection: bool = False):
     """
     Utility function untuk membuat ConversionEngine
