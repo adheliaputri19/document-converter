@@ -19,7 +19,7 @@ class FileHandler:
         if file_extension not in allowed_extensions:
             raise ValueError(f"Ekstensi file tidak didukung: {file_extension}. Harus: {allowed_extensions}")
         return True
-      @staticmethod
+    @staticmethod
     def validate_file_size(file_path: str) -> bool:
         """Validasi ukuran file"""
         file_size = os.path.getsize(file_path)
