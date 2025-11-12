@@ -1,67 +1,55 @@
+# utils/file_handler.py
 import os
 from pathlib import Path
+from typing import List, Dict
 
 
 class FileHandler:
-    """Utility class untuk menangani operasi file"""
-    
     @staticmethod
-    def validate_file_exists(file_path: str) -> bool:
-        """Validasi bahwa file exists"""
-        if not os.path.exists(file_path):
+    def validate_file_exists(file_path: str) -> Path:
+        path = Path(file_path)
+        if not path.is_file():
             raise FileNotFoundError(f"File tidak ditemukan: {file_path}")
-        return True
-    
+        return path
+
     @staticmethod
-    def validate_file_extension(file_path: str, allowed_extensions: list) -> bool:
-        """Validasi ekstensi file"""
-        file_extension = Path(file_path).suffix.lower()
-        if file_extension not in allowed_extensions:
-            raise ValueError(f"Ekstensi file tidak didukung: {file_extension}. Harus: {allowed_extensions}")
-        return True
+    def validate_file_extension(file_path: str, allowed: List[str]) -> None:
+        ext = Path(file_path).suffix.lower()
+        allowed = [a.lower() if a.startswith('.') else f".{a.lower()}" for a in allowed]
+        if ext not in allowed:
+            raise ValueError(f"Ekstensi tidak didukung: {ext}. Harus: {', '.join(allowed)}")
+
     @staticmethod
-    def validate_file_size(file_path: str) -> bool:
-        """Validasi ukuran file"""
-        file_size = os.path.getsize(file_path)
-        if file_size == 0:
-            raise ValueError("File kosong (0 bytes)")
-        return True
-    
+    def validate_file_size(file_path: str, min_size: int = 1) -> None:
+        if os.path.getsize(file_path) < min_size:
+            raise ValueError("File kosong atau terlalu kecil")
+
     @staticmethod
-    def auto_generate_output_path(input_path: str, conversion_type: str) -> str:
-        """Generate output path otomatis berdasarkan input path dan tipe konversi"""
-        input_file = Path(input_path)
-        
-        conversion_map = {
+    def auto_generate_output_path(input_path: str, conv_type: str) -> str:
+        input_file = FileHandler.validate_file_exists(input_path)
+        mapping = {
             'doc_to_pdf': '.pdf',
             'pdf_to_docx': '.docx',
             'pdf_to_doc': '.doc'
         }
-        
-        if conversion_type not in conversion_map:
-            raise ValueError(f"Tipe konversi tidak valid: {conversion_type}")
-        
-        output_extension = conversion_map[conversion_type]
-        return str(input_file.with_suffix(output_extension))
-    
+        if conv_type not in mapping:
+            raise ValueError(f"Tipe konversi tidak valid: {conv_type}")
+        return str(input_file.with_suffix(mapping[conv_type]))
+
     @staticmethod
-    def get_file_info(file_path: str) -> dict:
-        """Mendapatkan informasi file"""
-        path = Path(file_path)
+    def get_file_info(file_path: str) -> Dict:
+        path = FileHandler.validate_file_exists(file_path)
         return {
             'name': path.name,
-            'size': os.path.getsize(file_path),
+            'size': path.stat().st_size,
             'extension': path.suffix.lower(),
             'parent_dir': str(path.parent)
         }
-    
+
     @staticmethod
     def safe_delete(file_path: str) -> bool:
-        """Hapus file dengan safety check"""
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                return True
-            return False
-        except Exception:
+            Path(file_path).unlink(missing_ok=True)
+            return True
+        except:
             return False

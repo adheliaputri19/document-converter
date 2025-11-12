@@ -1,12 +1,7 @@
-# Core dependencies
 docx2pdf>=0.1.8
 PyMuPDF>=1.23.8
 python-docx>=1.1.0
 comtypes>=1.2.0
 pdf2docx>=0.5.8
-
-# GUI dependencies (included in standard Python)
-# tkinter
-
-# Optional dependencies for better performance
-pillow>=10.0.0
+Pillow>=10.0.0
+tkinterdnd2>=0.3.0

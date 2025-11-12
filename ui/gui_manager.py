@@ -1,332 +1,234 @@
+# ui/gui_manager.py
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from tkinterdnd2 import DND_FILES, TkinterDnD
 from pathlib import Path
+import threading
 import os
 
+# Fix path
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import sys
+sys.path.append(ROOT_DIR)
+
 from conversion.engine import ConversionEngine
+from conversion.compressor import DocumentCompressor
 from utils.file_handler import FileHandler
 
 
 class GUIManager:
-    """Manager untuk GUI application"""
-    
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Document Converter - DOC/DOCX ↔ PDF")
-        self.root.geometry("700x600")
-        self.root.resizable(True, True)
-        
-        # Initialize variables
+        self.root = TkinterDnD.Tk()
+        self.root.title("Document Converter & Compressor")
+        self.root.geometry("850x680")
+        self.root.minsize(750, 500)
+
+        # Variables
         self.input_path = tk.StringVar()
         self.output_path = tk.StringVar()
         self.conversion_type = tk.StringVar(value="doc_to_pdf")
-        self.conversion_method = tk.StringVar(value="auto")
-        self.status_text = tk.StringVar(value="")
-        
-        # Initialize conversion engine
-        self.conversion_engine = ConversionEngine()
-        self.has_ms_word = self.conversion_engine.check_ms_word_installation()
-        self.conversion_engine.has_ms_word = self.has_ms_word
-        
-        # Setup UI
-        self.setup_ui()
-    
-    def setup_ui(self):
-        """Setup user interface"""
-        # Frame utama
-        main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # Judul
-        title_label = ttk.Label(main_frame, text="Document Converter", 
-                               font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
-        
-        # Info sistem
-        system_info = self._get_system_info()
-        info_label = ttk.Label(main_frame, text=system_info, font=("Arial", 9))
-        info_label.grid(row=1, column=0, columnspan=2, pady=(0, 10))
-        
-        # Pilihan metode untuk PDF ke DOCX
-        self._setup_conversion_method_ui(main_frame)
-        
-        # Pilihan tipe konversi
-        self._setup_conversion_type_ui(main_frame)
-        
-        # Input dan output file
-        self._setup_file_selection_ui(main_frame)
-        
-        # Progress dan status
-        self._setup_progress_ui(main_frame)
-        
-        # Tombol aksi
-        self._setup_action_buttons(main_frame)
-        
-        # Konfigurasi grid
-        self._configure_grid_weights(main_frame)
-    
-    def _get_system_info(self) -> str:
-        """Dapatkan info sistem dan dukungan konversi"""
-        if self.has_ms_word:
-            return "✅ DOC → PDF   ✅ DOCX → PDF   ✅ PDF → DOCX   ✅ PDF → DOC"
-        else:
-            return "❌ DOC → PDF   ✅ DOCX → PDF   ✅ PDF → DOCX   ❌ PDF → DOC"
-    
-    def _setup_conversion_method_ui(self, parent):
-        """Setup UI untuk pemilihan metode konversi"""
-        method_frame = ttk.LabelFrame(parent, text="Metode PDF ke DOCX", padding="10")
-        method_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
-        
-        ttk.Radiobutton(method_frame, text="Auto (Rekomendasi)", 
-                       variable=self.conversion_method, value="auto").grid(row=0, column=0, sticky=tk.W)
-        
-        ttk.Radiobutton(method_frame, text="pdf2docx (Gambar + Formatting)", 
-                       variable=self.conversion_method, value="pdf2docx").grid(row=0, column=1, sticky=tk.W)
-        
-        ttk.Radiobutton(method_frame, text="PyMuPDF (Text + Gambar)", 
-                       variable=self.conversion_method, value="pymupdf").grid(row=1, column=0, sticky=tk.W)
-        
-        ttk.Radiobutton(method_frame, text="Text Only (Cepat)", 
-                       variable=self.conversion_method, value="text_only").grid(row=1, column=1, sticky=tk.W)
-    
-    def _setup_conversion_type_ui(self, parent):
-        """Setup UI untuk pemilihan tipe konversi"""
-        ttk.Radiobutton(parent, text="DOC/DOCX ke PDF", 
-                       variable=self.conversion_type, value="doc_to_pdf",
-                       command=self._on_conversion_change).grid(row=3, column=0, sticky=tk.W, pady=5)
-        
-        ttk.Radiobutton(parent, text="PDF ke DOCX", 
-                       variable=self.conversion_type, value="pdf_to_docx",
-                       command=self._on_conversion_change).grid(row=4, column=0, sticky=tk.W, pady=5)
-        
-        ttk.Radiobutton(parent, text="PDF ke DOC", 
-                       variable=self.conversion_type, value="pdf_to_doc",
-                       command=self._on_conversion_change).grid(row=5, column=0, sticky=tk.W, pady=5)
-    
-    def _setup_file_selection_ui(self, parent):
-        """Setup UI untuk seleksi file"""
-        # Input file
-        ttk.Label(parent, text="File Input:").grid(row=6, column=0, sticky=tk.W, pady=(20, 5))
-        
-        input_frame = ttk.Frame(parent)
-        input_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        
-        self.input_entry = ttk.Entry(input_frame, textvariable=self.input_path, width=50)
-        self.input_entry.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        
-        ttk.Button(input_frame, text="Browse", command=self.browse_input_file).grid(row=0, column=1, padx=(5, 0))
-        
-        # Output file
-        ttk.Label(parent, text="File Output:").grid(row=8, column=0, sticky=tk.W, pady=(20, 5))
-        
-        output_frame = ttk.Frame(parent)
-        output_frame.grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-        
-        self.output_entry = ttk.Entry(output_frame, textvariable=self.output_path, width=50)
-        self.output_entry.grid(row=0, column=0, sticky=(tk.W, tk.E))
-        
-        ttk.Button(output_frame, text="Browse", command=self.browse_output_file).grid(row=0, column=1, padx=(5, 0))
-    
-    def _setup_progress_ui(self, parent):
-        """Setup UI untuk progress dan status"""
-        self.progress = ttk.Progressbar(parent, mode='indeterminate')
-        self.progress.grid(row=10, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=20)
-        
-        self.status_label = ttk.Label(parent, textvariable=self.status_text)
-        self.status_label.grid(row=11, column=0, columnspan=2, pady=10)
-    
-    def _setup_action_buttons(self, parent):
-        """Setup tombol aksi"""
-        ttk.Button(parent, text="Konversi", command=self.convert_document).grid(row=12, column=0, pady=10)
-        ttk.Button(parent, text="Bersihkan", command=self.clear_fields).grid(row=12, column=1, pady=10)
-    
-    def _configure_grid_weights(self, parent):
-        """Konfigurasi grid weights untuk responsive layout"""
-        parent.columnconfigure(0, weight=1)
-        self.root.columnconfigure(0, weight=1)
+        self.method = tk.StringVar(value="auto")
+        self.compress_files = []
+        self.compress_output = tk.StringVar(value=os.getcwd())
+        self.compress_level = tk.StringVar(value="medium")
+
+        # Engine
+        self.engine = ConversionEngine()
+        self.has_ms_word = self.engine.check_ms_word_installation()
+        self.compressor = DocumentCompressor()
+
+        self._setup_ui()
+
+    def _setup_ui(self):
+        main = ttk.Frame(self.root, padding=15)
+        main.grid(row=0, column=0, sticky="nsew")
         self.root.rowconfigure(0, weight=1)
-    
-    def _on_conversion_change(self):
-        """Handler ketika tipe konversi berubah"""
-        current_input = self.input_path.get()
-        if current_input:
-            self.auto_generate_output_path(current_input)
-    
-    def browse_input_file(self):
-        """Browse file input"""
-        file_types = self._get_input_file_types()
-        
-        filename = filedialog.askopenfilename(filetypes=file_types)
-        if filename:
-            if self.conversion_type.get() == "pdf_to_doc" and not self.has_ms_word:
-                self._show_ms_word_required_error()
-                return
-                
-            self.input_path.set(filename)
-            self.auto_generate_output_path(filename)
-    
-    def _get_input_file_types(self):
-        """Dapatkan tipe file untuk dialog input"""
-        conversion_type = self.conversion_type.get()
-        
-        if conversion_type == "doc_to_pdf":
-            if self.has_ms_word:
-                return [
-                    ("Word Documents", "*.docx"),
-                    ("Word Documents", "*.doc"),
-                    ("All supported", "*.docx;*.doc")
-                ]
-            else:
-                return [("Word Documents (.docx only)", "*.docx")]
-        else:
-            return [
-                ("PDF Files", "*.pdf"),
-                ("All PDF Files", "*.pdf")
-            ]
-    
-    def _show_ms_word_required_error(self):
-        """Tampilkan error Microsoft Word required"""
-        messagebox.showerror(
-            "Microsoft Word Diperlukan", 
-            "Konversi PDF ke DOC membutuhkan Microsoft Word.\n\n"
-            "Microsoft Word tidak terdeteksi di sistem Anda.\n"
-            "Silakan:\n"
-            "• Install Microsoft Word, atau\n"
-            "• Gunakan opsi 'PDF ke DOCX' sebagai alternatif"
-        )
-    
-    def browse_output_file(self):
-        """Browse file output"""
-        file_types, default_extension = self._get_output_file_types()
-        
-        filename = filedialog.asksaveasfilename(
-            filetypes=file_types,
-            defaultextension=default_extension
-        )
-        if filename:
-            self.output_path.set(filename)
-    
-    def _get_output_file_types(self):
-        """Dapatkan tipe file untuk dialog output"""
-        conversion_type = self.conversion_type.get()
-        
-        if conversion_type == "doc_to_pdf":
-            return [("PDF Files", "*.pdf")], ".pdf"
-        elif conversion_type == "pdf_to_docx":
-            return [("Word Documents", "*.docx")], ".docx"
-        else:
-            return [("Word Documents", "*.doc")], ".doc"
-    
-    def auto_generate_output_path(self, input_path):
-        """Generate output path otomatis"""
-        try:
-            output_path = FileHandler.auto_generate_output_path(
-                input_path, 
-                self.conversion_type.get()
-            )
-            self.output_path.set(output_path)
-        except ValueError as e:
-            messagebox.showerror("Error", str(e))
-    
-    def convert_document(self):
-        """Eksekusi konversi dokumen"""
-        input_file = self.input_path.get()
-        output_file = self.output_path.get()
-        
-        # Validasi input
-        if not self._validate_conversion_input(input_file, output_file):
+        self.root.columnconfigure(0, weight=1)
+
+        nb = ttk.Notebook(main)
+        nb.grid(row=0, column=0, sticky="nsew")
+        main.rowconfigure(0, weight=1)
+        main.columnconfigure(0, weight=1)
+
+        self.tab_convert = ttk.Frame(nb)
+        self.tab_compress = ttk.Frame(nb)
+        nb.add(self.tab_convert, text="Konversi")
+        nb.add(self.tab_compress, text="Kompres Ukuran")
+
+        self._setup_convert_tab()
+        self._setup_compress_tab()
+
+    def _setup_convert_tab(self):
+        f = self.tab_convert
+        ttk.Label(f, text="Konversi Dokumen", font=("Arial", 16, "bold")).grid(row=0, column=0, columnspan=3, pady=15)
+        info = f"MS Word: {'Terdeteksi' if self.has_ms_word else 'Tidak'}"
+        ttk.Label(f, text=info, foreground="green" if self.has_ms_word else "red").grid(row=1, column=0, columnspan=3)
+
+        # Input
+        ttk.Label(f, text="File Input:").grid(row=2, column=0, sticky="e", pady=5)
+        ttk.Entry(f, textvariable=self.input_path, width=50).grid(row=2, column=1, pady=5)
+        ttk.Button(f, text="Browse", command=self._browse_input).grid(row=2, column=2, pady=5)
+
+        # Output
+        ttk.Label(f, text="File Output:").grid(row=3, column=0, sticky="e", pady=5)
+        ttk.Entry(f, textvariable=self.output_path, width=50).grid(row=3, column=1, pady=5)
+        ttk.Button(f, text="Browse", command=self._browse_output).grid(row=3, column=2, pady=5)
+
+        # Tipe
+        ttk.Label(f, text="Tipe Konversi:").grid(row=4, column=0, sticky="e", pady=5)
+        combo = ttk.Combobox(f, textvariable=self.conversion_type, values=["doc_to_pdf", "pdf_to_docx", "pdf_to_doc"], state="readonly")
+        combo.grid(row=4, column=1, pady=5)
+        combo.bind("<<ComboboxSelected>>", self._update_output_suggestion)
+
+        # Metode
+        ttk.Label(f, text="Metode (PDF→DOCX):").grid(row=5, column=0, sticky="e", pady=5)
+        ttk.Combobox(f, textvariable=self.method, values=["auto", "pdf2docx", "pymupdf", "text_only"], state="readonly").grid(row=5, column=1, pady=5)
+
+        # Tombol
+        btn = ttk.Button(f, text="MULAI KONVERSI", command=self._start_convert)
+        btn.grid(row=6, column=1, pady=25)
+
+        # Progress
+        self.progress = ttk.Progressbar(f, mode="indeterminate")
+        self.progress.grid(row=7, column=0, columnspan=3, sticky="ew", pady=10)
+
+    def _browse_input(self):
+        file = filedialog.askopenfilename(filetypes=[("Dokumen", "*.doc *.docx *.pdf")])
+        if file:
+            self.input_path.set(file)
+            self._update_output_suggestion()
+
+    def _browse_output(self):
+        ext_map = {".pdf": "*.pdf", ".docx": "*.docx", ".doc": "*.doc"}
+        typ = self.conversion_type.get()
+        default_ext = { "doc_to_pdf": ".pdf", "pdf_to_docx": ".docx", "pdf_to_doc": ".doc" }.get(typ, ".pdf")
+        file = filedialog.asksaveasfilename(defaultextension=default_ext, filetypes=[("File", ext_map[default_ext])])
+        if file:
+            self.output_path.set(file)
+
+    def _update_output_suggestion(self, event=None):
+        inp = self.input_path.get()
+        if inp:
+            self.output_path.set(FileHandler.auto_generate_output_path(inp, self.conversion_type.get()))
+
+    def _start_convert(self):
+        if not self.input_path.get() or not self.output_path.get():
+            messagebox.showwarning("Error", "Pilih file input dan output dulu!")
             return
-        
-        try:
-            self._start_conversion()
-            
-            # Eksekusi konversi
-            success = self.conversion_engine.convert(
-                conversion_type=self.conversion_type.get(),
-                input_file=input_file,
-                output_file=output_file,
-                conversion_method=self.conversion_method.get()
-            )
-            
-            if success:
-                self._on_conversion_success(output_file)
-            else:
-                raise Exception("Konversi gagal tanpa error spesifik")
-            
-        except Exception as e:
-            self._on_conversion_error(e)
-    
-    def _validate_conversion_input(self, input_file: str, output_file: str) -> bool:
-        """Validasi input konversi"""
-        if not input_file:
-            messagebox.showerror("Error", "Pilih file input terlebih dahulu!")
-            return False
-            
-        if not output_file:
-            messagebox.showerror("Error", "Pilih lokasi output terlebih dahulu!")
-            return False
-            
-        if not os.path.exists(input_file):
-            messagebox.showerror("Error", "File input tidak ditemukan!")
-            return False
-            
-        return True
-    
-    def _start_conversion(self):
-        """Persiapan sebelum konversi"""
         self.progress.start()
-        self.status_text.set("Sedang mengkonversi...")
-        self.root.update()
-    
-    def _on_conversion_success(self, output_file: str):
-        """Handler ketika konversi sukses"""
-        self.progress.stop()
-        self.status_text.set("Konversi berhasil!")
-        
-        if os.path.exists(output_file):
-            file_size = os.path.getsize(output_file)
-            messagebox.showinfo("Sukses", 
-                f"File berhasil dikonversi!\n\n"
-                f"Output: {output_file}\n"
-                f"Size: {file_size} bytes")
-        else:
-            raise Exception("File output tidak berhasil dibuat")
-    
-    def _on_conversion_error(self, error: Exception):
-        """Handler ketika konversi error"""
-        self.progress.stop()
-        self.status_text.set("Error!")
-        error_msg = f"Terjadi kesalahan saat konversi:\n{str(error)}"
-        print(f"ERROR DETAIL: {error_msg}")
-        messagebox.showerror("Error", error_msg)
-    
-    def clear_fields(self):
-        """Bersihkan semua field"""
-        self.input_path.set("")
-        self.output_path.set("")
-        self.status_text.set("")
-    
-    def run(self):
-        """Jalankan aplikasi"""
-        self._check_dependencies()
-        self.root.mainloop()
-    
-    def _check_dependencies(self):
-        """Cek dependencies dan tampilkan warning jika perlu"""
+        threading.Thread(target=self._run_convert, daemon=True).start()
+
+    def _run_convert(self):
         try:
-            from conversion.strategies import LIBRARY_AVAILABLE
-            if not LIBRARY_AVAILABLE:
-                self._show_installation_instructions()
-        except ImportError:
-            self._show_installation_instructions()
-    
-    def _show_installation_instructions(self):
-        """Tampilkan instruksi instalasi"""
-        messagebox.showwarning(
-            "Library Tidak Ditemukan",
-            "Library diperlukan tidak terinstall.\n\n"
-            "Untuk hasil terbaik (dengan gambar), install:\n"
-            "pip install docx2pdf pdf2docx pymupdf python-docx comtypes\n\n"
-            "Minimal installation:\n"
-            "pip install docx2pdf pymupdf python-docx"
-        )
+            kwargs = {'method': self.method.get()} if self.conversion_type.get() == 'pdf_to_docx' else {}
+            self.engine.convert(self.conversion_type.get(), self.input_path.get(), self.output_path.get(), **kwargs)
+            messagebox.showinfo("Sukses", "Konversi selesai!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Gagal: {str(e)}")
+        finally:
+            self.progress.stop()
+
+    def _setup_compress_tab(self):
+        f = self.tab_compress
+        ttk.Label(f, text="Kompres Ukuran File", font=("Arial", 16, "bold")).grid(row=0, column=0, columnspan=3, pady=15)
+
+        # Level
+        ttk.Label(f, text="Level Kompresi:").grid(row=1, column=0, sticky="e", pady=5)
+        ttk.Combobox(f, textvariable=self.compress_level, values=["low", "medium", "high"], state="readonly").grid(row=1, column=1, pady=5)
+
+        # Daftar file
+        ttk.Label(f, text="File untuk dikompres:").grid(row=2, column=0, columnspan=3, pady=5)
+        frame = ttk.Frame(f)
+        frame.grid(row=3, column=0, columnspan=3, sticky="nsew", pady=5)
+        f.rowconfigure(3, weight=1)
+
+        self.listbox = tk.Listbox(frame, height=12)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.listbox.yview)
+        self.listbox.config(yscrollcommand=scrollbar.set)
+        self.listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Drag & drop
+        self.listbox.drop_target_register(DND_FILES)
+        self.listbox.dnd_bind('<<Drop>>', self._drop_files)
+
+        # Tombol
+        btn_frame = ttk.Frame(f)
+        btn_frame.grid(row=4, column=0, columnspan=3, pady=5)
+        ttk.Button(btn_frame, text="Tambah File", command=self._add_files).grid(row=0, column=0, padx=5)
+        ttk.Button(btn_frame, text="Tambah Folder", command=self._add_folder).grid(row=0, column=1, padx=5)
+        ttk.Button(btn_frame, text="Hapus Semua", command=self._clear_files).grid(row=0, column=2, padx=5)
+
+        # Output folder
+        ttk.Label(f, text="Folder Output:").grid(row=5, column=0, sticky="e", pady=5)
+        ttk.Entry(f, textvariable=self.compress_output, width=50).grid(row=5, column=1, pady=5)
+        ttk.Button(f, text="Browse", command=self._browse_output_folder).grid(row=5, column=2, pady=5)
+
+        # Tombol kompres
+        ttk.Button(f, text="MULAI KOMPRES", command=self._start_compress).grid(row=6, column=1, pady=20)
+
+        # Progress
+        self.c_progress = ttk.Progressbar(f, mode="determinate")
+        self.c_progress.grid(row=7, column=0, columnspan=3, sticky="ew", pady=10)
+
+    def _add_files(self):
+        files = filedialog.askopenfilenames(filetypes=[("Dokumen", "*.pdf *.docx")])
+        if files:
+            self.compress_files.extend(files)
+            self._update_list()
+
+    def _add_folder(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.compress_files.extend([str(p) for p in Path(folder).rglob('*') if p.suffix.lower() in {'.pdf', '.docx'}])
+            self._update_list()
+
+    def _drop_files(self, event):
+        files = self.root.tk.splitlist(event.data)
+        self.compress_files.extend([f for f in files if Path(f).suffix.lower() in {'.pdf', '.docx'}])
+        self._update_list()
+
+    def _update_list(self):
+        self.listbox.delete(0, tk.END)
+        for f in self.compress_files:
+            self.listbox.insert(tk.END, Path(f).name)
+
+    def _clear_files(self):
+        self.compress_files.clear()
+        self._update_list()
+
+    def _browse_output_folder(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.compress_output.set(folder)
+
+    def _start_compress(self):
+        if not self.compress_files:
+            messagebox.showwarning("Error", "Pilih file dulu!")
+            return
+        if not os.path.isdir(self.compress_output.get()):
+            messagebox.showerror("Error", "Pilih folder output yang valid!")
+            return
+        threading.Thread(target=self._run_compress, daemon=True).start()
+
+    def _run_compress(self):
+        total = len(self.compress_files)
+        self.c_progress["maximum"] = total
+        self.c_progress["value"] = 0
+        level = self.compress_level.get()
+        out_dir = Path(self.compress_output.get())
+
+        for i, f in enumerate(self.compress_files):
+            self.c_progress["value"] = i + 1
+            self.root.update_idletasks()
+            try:
+                name = Path(f).name
+                out_path = out_dir / f"compressed_{name}"
+                self.compressor.compress(f, str(out_path), level)
+            except Exception as e:
+                print(f"[ERROR] {f}: {e}")
+
+        messagebox.showinfo("Sukses", f"{total} file berhasil dikompres di:\n{out_dir}")
+
+    def run(self):
+        self.root.mainloop()
