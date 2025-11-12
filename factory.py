@@ -1,4 +1,3 @@
-# factory.py
 from conversion.engine import ConversionEngine
 from ui.gui_manager import GUIManager
 from cli.cli_converter import CLIConverter

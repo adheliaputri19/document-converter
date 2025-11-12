@@ -1,4 +1,3 @@
-# conversion/strategies.py
 import os
 import tempfile
 import shutil

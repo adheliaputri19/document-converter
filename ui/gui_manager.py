@@ -16,6 +16,7 @@ from conversion.compressor import DocumentCompressor
 from utils.file_handler import FileHandler
 
 
+
 class GUIManager:
     def __init__(self):
         self.root = TkinterDnD.Tk()
