@@ -1,4 +1,4 @@
-# ui/gui_manager.py
+
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -6,7 +6,7 @@ from pathlib import Path
 import threading
 import os
 
-# Fix path
+
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import sys
 sys.path.append(ROOT_DIR)
