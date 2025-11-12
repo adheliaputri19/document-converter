@@ -1,10 +1,8 @@
-# cli/cli_converter.py
 import argparse
 import os
 import sys
 import time
 
-# Add parent directory to path untuk import
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from conversion.engine import create_conversion_engine

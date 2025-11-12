@@ -1,4 +1,3 @@
-# factory.py
 from conversion.engine import ConversionEngine
 from ui.gui_manager import GUIManager
 
@@ -35,10 +34,10 @@ class ConverterFactory:
         
         dependencies = {
             'Microsoft Word': engine.check_ms_word_installation(),
-            'docx2pdf': True,  # Akan di-check saat runtime
-            'PyMuPDF': True,   # Akan di-check saat runtime
-            'python-docx': True,  # Akan di-check saat runtime
-            'pdf2docx': True,  # Akan di-check saat runtime
+            'docx2pdf': True,  
+            'PyMuPDF': True,   
+            'python-docx': True,  
+            'pdf2docx': True,  
             'comtypes': True   # Akan di-check saat runtime
         }
         
