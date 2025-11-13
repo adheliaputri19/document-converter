@@ -104,7 +104,7 @@ class GUIManager:
         """Setup tkinter variables"""
         self.input_path = tk.StringVar()
         self.output_path = tk.StringVar()
-        self.conversion_type = tk.StringVar(value="doc_to_pdf")
+        self.conversion_type = tk.StringVar(value="docx_to_pdf")
         self.method = tk.StringVar(value="auto")
         self.compress_files = []
         self.compress_output = tk.StringVar(value=os.path.expanduser("~/Documents"))
