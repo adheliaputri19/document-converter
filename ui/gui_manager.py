@@ -251,7 +251,7 @@ class GUIManager:
             row=0, column=0, sticky="w", pady=12, padx=10)
         
         type_combo = ttk.Combobox(settings_frame, textvariable=self.conversion_type, 
-                                values=["doc_to_pdf", "pdf_to_docx", "pdf_to_doc"], 
+                                values=["doc_to_pdf", "docx_to_pdf", "pdf_to_docx", "pdf_to_doc"], 
                                 state="readonly", font=('Arial', 10))
         type_combo.grid(row=0, column=1, sticky="ew", pady=12, padx=(0, 10))
         type_combo.bind("<<ComboboxSelected>>", self._update_output_suggestion)
