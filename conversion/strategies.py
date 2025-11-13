@@ -94,7 +94,7 @@ class PdfToDocxStrategy(ConversionStrategy):
 
     def validate_input(self, input_file: str) -> bool:
         if not input_file.lower().endswith('.pdf'):
-            raise ValueError("Harus PDF")
+            raise ValueError("Harus file PDF")
         if not os.path.exists(input_file):
             raise FileNotFoundError("File PDF tidak ada")
         return True
@@ -171,7 +171,7 @@ class PdfToDocStrategy(ConversionStrategy):
         if not self.has_ms_word:
             raise Exception("PDF → DOC butuh MS Word")
         if not input_file.lower().endswith('.pdf'):
-            raise ValueError("Input harus PDF")
+            raise ValueError("Input harus file PDF")
         return True
 
     def convert(self, input_file: str, output_file: str) -> bool:
