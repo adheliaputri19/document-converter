@@ -22,7 +22,7 @@ class FileHandler:
     @staticmethod
     def validate_file_size(file_path: str, min_size: int = 1) -> None:
         if os.path.getsize(file_path) < min_size:
-            raise ValueError("File kosong atau terlalu kecil")
+            raise ValueError("File tidak ada atau terlalu kecil")
 
     @staticmethod
     def auto_generate_output_path(input_path: str, conv_type: str) -> str:
